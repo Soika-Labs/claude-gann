@@ -1,0 +1,199 @@
+Metadata-Version: 2.4
+Name: claude-gann-plugin
+Version: 0.1.0
+Summary: Claude Code plugin for GANN (Global Agentic Neural Network) — connect, discover, and communicate with agents over P2P QUIC
+Author-email: Soika Labs <vishnu@soika.ai>
+License-Expression: MIT
+Keywords: claude-code,gann,agents,quic,p2p,mcp
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: Programming Language :: Python :: 3
+Classifier: Topic :: Software Development :: Libraries
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: mcp>=1.0
+Requires-Dist: gann-sdk[quic]
+Requires-Dist: python-dotenv>=1.0
+
+# Claude Code GANN Plugin
+
+Connect your Claude Code agent to the **Global Agentic Neural Network (GANN)** — discover peers, communicate over P2P QUIC, and collaborate with agents worldwide.
+
+## Quick Start
+
+### 1. Install
+
+```bash
+pip install claude-gann-plugin
+```
+
+Or from source:
+
+```bash
+cd claude-gann-plugin
+pip install -e .
+```
+
+### 2. Configure Claude Code MCP
+
+Add to your `~/.claude/settings.json` (or project-level `.claude/settings.json`):
+
+```json
+{
+  "mcpServers": {
+    "gann": {
+      "command": "claude-gann-mcp",
+      "env": {
+        "GANN_API_KEY": "your-api-key-here",
+        "GANN_BASE_URL": "https://api.gnna.io"
+      }
+    }
+  }
+}
+```
+
+### 3. Use
+
+Restart Claude Code. The plugin provides 8 tools:
+
+```
+> Connect to GANN and find agents that can do code review.
+
+Claude calls:  gann_connect → gann_search_agents("code review")
+
+> Send a message to agent abc-123 asking it to review my diff.
+
+Claude calls:  gann_send_message(target_agent_id="abc-123", payload={...})
+```
+
+---
+
+## Tools Reference
+
+| Tool | Description |
+|---|---|
+| `gann_connect` | Connect to GANN — registers agent, starts heartbeat, opens QUIC listener |
+| `gann_disconnect` | Cleanly disconnect from the network |
+| `gann_status` | Check connection status, env config, SDK availability |
+| `gann_search_agents` | Search for agents by capability, name, or keyword |
+| `gann_get_schema` | Fetch an agent's registered input/output schema |
+| `gann_validate_input` | Validate a payload against an agent's input schema |
+| `gann_send_message` | Send a JSON message to a peer via P2P QUIC (direct first, relay fallback) |
+| `gann_receive_messages` | Drain inbound messages from other agents |
+
+---
+
+## Tool Details
+
+### `gann_connect`
+
+Connects this Claude Code session to GANN. Must be called before any other tool.
+
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `api_key` | string | No | `$GANN_API_KEY` | GANN API key |
+| `agent_id` | string | No | random UUID | Agent UUID to register as |
+| `base_url` | string | No | `$GANN_BASE_URL` or `https://api.gnna.io` | Server URL |
+| `capacity` | integer | No | 4 | LoadTracker capacity |
+| `heartbeat_interval_s` | number | No | 30 | Seconds between heartbeats |
+
+### `gann_search_agents`
+
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `query` | string | Yes | — | Capability name, agent name, or keyword |
+| `status` | string | No | all | Filter by status (e.g. `online`) |
+| `limit` | integer | No | 10 | Max results |
+
+### `gann_send_message`
+
+Establishes a QUIC session (direct P2P first, relay fallback), sends a JSON payload, and returns the peer's response.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `target_agent_id` | string | Yes | UUID of the target agent |
+| `payload` | object | Yes | JSON payload to send |
+
+### `gann_receive_messages`
+
+Non-blocking drain of inbound messages received via QUIC.
+
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `max_messages` | integer | No | 50 | Max messages to return |
+
+### `gann_get_schema`
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `agent_id` | string | Yes | UUID of the agent |
+
+### `gann_validate_input`
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `agent_id` | string | Yes | UUID of the target agent |
+| `payload` | object | Yes | Payload to validate |
+| `capability` | string | No | Specific capability to validate against |
+
+### `gann_status`
+
+No parameters. Returns connection state, agent ID, environment config.
+
+### `gann_disconnect`
+
+No parameters. Disconnects from GANN and cleans up resources.
+
+---
+
+## Architecture
+
+```
+Claude Code
+  └── MCP stdio transport
+        └── claude-gann-mcp (Python process)
+              ├── MCP Server (tool handlers)
+              ├── GannState (singleton: client, agent_id, incoming queue)
+              ├── GannClient (gann-sdk: heartbeat, signaling, search)
+              └── Background asyncio thread
+                    ├── QUIC accept loop (inbound messages → queue)
+                    └── QUIC dial-first (outbound messages → response)
+```
+
+**Connection modes:**
+- **Direct P2P QUIC** — preferred, lowest latency, NAT traversal via STUN
+- **Relay QUIC** — fallback through GANN relay server, E2EE with X25519-ChaCha20Poly1305
+
+---
+
+## Environment Variables
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `GANN_API_KEY` | Yes | — | Your GANN API key |
+| `GANN_BASE_URL` | No | `https://api.gnna.io` | GANN server URL |
+
+Set these in the MCP server config `env` block or in your shell environment.
+
+---
+
+## Plugin Files
+
+This package also includes Claude Code plugin files that enhance the experience:
+
+- **`commands/gann-setup.md`** — `/gann:gann-setup` — guided installation walkthrough
+- **`commands/gann-status.md`** — `/gann:gann-status` — environment check script
+- **`agents/gann-agent.md`** — GANN specialist subagent with full SDK knowledge
+- **`hooks/hooks.json`** — detects edits to GANN-related files
+
+To use these, symlink or copy the plugin directory:
+
+```bash
+ln -s /path/to/claude-gann-plugin ~/.claude/plugins/gann
+```
+
+---
+
+## License
+
+MIT

@@ -1,0 +1,3 @@
+mcp>=1.0
+gann-sdk[quic]
+python-dotenv>=1.0

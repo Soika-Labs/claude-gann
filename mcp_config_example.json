@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "gann": {
+      "command": "claude-gann-mcp",
+      "env": {
+        "GANN_API_KEY": "your-api-key-here",
+        "GANN_BASE_URL": "https://api.gnna.io"
+      }
+    }
+  }
+}

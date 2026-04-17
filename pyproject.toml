@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "claude-gann-plugin"
+version = "0.1.0"
+description = "Claude Code plugin for GANN (Global Agentic Neural Network) — connect, discover, and communicate with agents over P2P QUIC"
+license = "MIT"
+authors = [
+  {name = "Soika Labs", email = "vishnu@soika.ai"},
+]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "mcp>=1.0",
+  "gann-sdk[quic]",
+  "python-dotenv>=1.0",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Topic :: Software Development :: Libraries",
+]
+keywords = ["claude-code", "gann", "agents", "quic", "p2p", "mcp"]
+
+[project.scripts]
+claude-gann-mcp = "claude_gann.mcp_server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

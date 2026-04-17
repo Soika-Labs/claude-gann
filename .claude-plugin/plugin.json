@@ -1,0 +1,11 @@
+{
+  "name": "gann",
+  "description": "GANN (Global Agentic Neural Network) integration for Claude Code. Connect your agent to the global network, discover peers, and communicate over P2P QUIC or relay.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Soika Labs"
+  },
+  "homepage": "https://github.com/Soika-Labs/gann-sdk-py",
+  "license": "MIT",
+  "keywords": ["gann", "agents", "quic", "p2p", "networking", "mcp"]
+}

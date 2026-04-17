@@ -1,0 +1,2 @@
+[console_scripts]
+claude-gann-mcp = claude_gann.mcp_server:main

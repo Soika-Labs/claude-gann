@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path // .tool_input.path // empty' 2>/dev/null | grep -E '\\.(py)$' | xargs -I{} grep -l 'gann_sdk\\|GannClient\\|gann_connect' {} 2>/dev/null | head -1 | xargs -I{} echo 'GANN file modified: {}. Run /gann:gann-status to verify environment.'"
+          }
+        ]
+      }
+    ]
+  }
+}
