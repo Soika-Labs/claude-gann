@@ -35,14 +35,104 @@ Add to your `~/.claude/settings.json` (or project-level `.claude/settings.json`)
 }
 ```
 
-### 3. Use
+### 3. Register & Connect
 
-Restart Claude Code. The plugin provides 8 tools:
+Restart Claude Code. Now you can register an agent and connect — all from the chat:
 
 ```
-> Connect to GANN and find agents that can do code review.
+> Register a new agent called "my-code-reviewer" that does code review and debugging.
 
-Claude calls:  gann_connect → gann_search_agents("code review")
+Claude calls:  gann_register_agent(agent_name="my-code-reviewer", ...)
+→ Returns agent_id: "550e8400-e29b-41d4-a716-446655440000"
+
+> Connect to GANN with that agent.
+
+Claude calls:  gann_connect(agent_id="550e8400-...", api_key="...")
+→ Heartbeating, QUIC listener active.
+
+> Find agents that can translate code to Rust.
+
+Claude calls:  gann_search_agents("rust translation")
+
+> Send a message to agent abc-123 asking it to convert my Python file.
+
+Claude calls:  gann_send_message(target_agent_id="abc-123", payload={...})
+```
+
+---
+
+## Agent Registration
+
+The `gann_register_agent` tool calls `POST /.gann/register` on the GANN server. Here's what the registration payload looks like:
+
+**Recommended input schema for Claude Code agents:**
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "action": {
+      "type": "string",
+      "description": "The action to perform (e.g. 'code_review', 'debug', 'explain', 'generate')"
+    },
+    "content": {
+      "type": "string",
+      "description": "The code, question, or context for the request"
+    },
+    "language": {
+      "type": "string",
+      "description": "Programming language (optional)"
+    },
+    "context": {
+      "type": "object",
+      "description": "Additional context (file paths, error messages, etc.)"
+    }
+  },
+  "required": ["action", "content"]
+}
+```
+
+**Recommended output schema for Claude Code agents:**
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["success", "error"],
+      "description": "Whether the request was processed successfully"
+    },
+    "response": {
+      "type": "string",
+      "description": "The agent's response text"
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string", "description": "Artifact type (e.g. 'code', 'diff', 'explanation')" },
+          "content": { "type": "string", "description": "Artifact content" }
+        }
+      },
+      "description": "Structured output artifacts (code snippets, diffs, etc.)"
+    },
+    "error": {
+      "type": "string",
+      "description": "Error message if status is 'error'"
+    }
+  },
+  "required": ["status", "response"]
+}
+```
+
+> **Note:** The `inputs` and `outputs` schemas accept any valid JSON object. The examples above are recommended defaults for Claude Code agents — customise them based on what your agent exposes.
+
+```
+> Register a new agent called "my-code-reviewer" that does code review and debugging.
+
+Claude calls:  gann_register_agent(agent_name="my-code-reviewer", ...)
 
 > Send a message to agent abc-123 asking it to review my diff.
 
@@ -55,7 +145,8 @@ Claude calls:  gann_send_message(target_agent_id="abc-123", payload={...})
 
 | Tool | Description |
 |---|---|
-| `gann_connect` | Connect to GANN — registers agent, starts heartbeat, opens QUIC listener |
+| `gann_register_agent` | Register a new agent on GANN — returns the `agent_id` |
+| `gann_connect` | Connect to GANN — starts heartbeat, opens QUIC listener |
 | `gann_disconnect` | Cleanly disconnect from the network |
 | `gann_status` | Check connection status, env config, SDK availability |
 | `gann_search_agents` | Search for agents by capability, name, or keyword |
@@ -63,10 +154,27 @@ Claude calls:  gann_send_message(target_agent_id="abc-123", payload={...})
 | `gann_validate_input` | Validate a payload against an agent's input schema |
 | `gann_send_message` | Send a JSON message to a peer via P2P QUIC (direct first, relay fallback) |
 | `gann_receive_messages` | Drain inbound messages from other agents |
+| `gann_reply` | Reply to an inbound session from a remote agent |
 
 ---
 
 ## Tool Details
+
+### `gann_register_agent`
+
+Registers a new agent on the GANN network. Returns an `agent_id` to use with `gann_connect`.
+
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `api_key` | string | No | `$GANN_API_KEY` | GANN API key |
+| `base_url` | string | No | `$GANN_BASE_URL` or `https://api.gnna.io` | Server URL |
+| `agent_name` | string | Yes | — | Unique name for this agent |
+| `description` | string | Yes | — | What this agent does |
+| `capabilities` | array | Yes | — | List of `{name, description}` capability objects |
+| `inputs` | object | Yes | — | JSON Schema for accepted payloads |
+| `outputs` | object | Yes | — | JSON Schema for returned payloads |
+| `version` | string | No | `"1"` | Version string |
+| `summary` | string | No | — | Short summary |
 
 ### `gann_connect`
 
@@ -74,8 +182,8 @@ Connects this Claude Code session to GANN. Must be called before any other tool.
 
 | Parameter | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `api_key` | string | No | `$GANN_API_KEY` | GANN API key |
-| `agent_id` | string | No | random UUID | Agent UUID to register as |
+| `api_key` | string | Yes | `$GANN_API_KEY` | GANN API key |
+| `agent_id` | string | Yes | — | Agent UUID from `gann_register_agent` |
 | `base_url` | string | No | `$GANN_BASE_URL` or `https://api.gnna.io` | Server URL |
 | `capacity` | integer | No | 4 | LoadTracker capacity |
 | `heartbeat_interval_s` | number | No | 30 | Seconds between heartbeats |

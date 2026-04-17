@@ -23,7 +23,7 @@ TOOL_DEF = {
             },
             "agent_id": {
                 "type": "string",
-                "description": "UUID of the agent to register as. A random UUID is generated if omitted.",
+                "description": "UUID of the agent to register as (required).",
             },
             "base_url": {
                 "type": "string",
@@ -40,7 +40,7 @@ TOOL_DEF = {
                 "default": 30,
             },
         },
-        "required": [],
+        "required": ["api_key", "agent_id"],
     },
 }
 
@@ -70,7 +70,13 @@ def handle(arguments: dict) -> str:
             "error": "No API key provided. Pass api_key or set GANN_API_KEY env var.",
         })
 
-    agent_id = uuid.UUID(agent_id_str) if agent_id_str else uuid.uuid4()
+    if not agent_id_str:
+        return json.dumps({
+            "connected": False,
+            "error": "No agent_id provided. Pass the UUID of the agent to register as.",
+        })
+
+    agent_id = uuid.UUID(agent_id_str)
     tracker = LoadTracker(capacity=capacity)
 
     client = GannClient(
