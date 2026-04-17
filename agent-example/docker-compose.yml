@@ -1,0 +1,15 @@
+services:
+  gann-agent:
+    build:
+      context: ..
+      dockerfile: agent-example/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - GANN_API_KEY=${GANN_API_KEY}
+      - GANN_AGENT_ID=${GANN_AGENT_ID}
+      - GANN_BASE_URL=${GANN_BASE_URL:-https://api.gnna.io}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-sonnet-4-20250514}
+      - AGENT_SYSTEM_PROMPT=${AGENT_SYSTEM_PROMPT:-}

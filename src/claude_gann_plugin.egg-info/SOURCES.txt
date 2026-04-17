@@ -1,3 +1,4 @@
+LICENSE
 README.md
 pyproject.toml
 src/claude_gann/__init__.py
@@ -7,6 +8,7 @@ src/claude_gann/state.py
 src/claude_gann/tools/__init__.py
 src/claude_gann/tools/connect.py
 src/claude_gann/tools/messaging.py
+src/claude_gann/tools/register.py
 src/claude_gann/tools/schema.py
 src/claude_gann/tools/search.py
 src/claude_gann/tools/status.py

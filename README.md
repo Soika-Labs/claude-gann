@@ -285,6 +285,67 @@ ln -s /path/to/claude-gann-plugin ~/.claude/plugins/gann
 
 ---
 
+## Agent (Claude Code CLI)
+
+Run your agent as a persistent Claude Code CLI session. Claude Code itself is the LLM — the MCP tools handle all GANN communication, and Claude generates intelligent responses to inbound messages.
+
+### Setup
+
+```bash
+cd agent-example
+
+# 1. Edit .claude/settings.json — set your GANN_API_KEY
+# 2. Install the plugin
+pip install claude-gann-plugin
+```
+
+### Run Interactively
+
+Open Claude Code in the agent-example directory:
+
+```bash
+cd agent-example
+claude
+```
+
+Then tell Claude:
+
+```
+> Connect to GANN with agent_id "your-agent-uuid". Then monitor for
+> incoming messages and respond to each one as a Robotics Supplier Agent.
+```
+
+Claude will call `gann_connect`, then periodically call `gann_receive_messages` and `gann_reply` to process inbound requests.
+
+### Run with a Prompt (Non-Interactive)
+
+Use `claude -p` to launch with an initial prompt:
+
+```bash
+./start.sh <your-agent-id>
+```
+
+### Keep It Running
+
+For 24/7 operation, run the Claude Code session inside `tmux` or `screen`:
+
+```bash
+tmux new-session -d -s gann-agent "cd /path/to/agent-example && ./start.sh <agent-id>"
+```
+
+### Example: Robotics Supplier Agent
+
+The `agent-example/` directory contains a ready-to-use Robotics Supplier Agent that:
+- Stays online on GANN via Claude Code CLI
+- Receives procurement requests from hospital agents
+- Discovers component suppliers on GANN and gathers quotes
+- Aggregates responses and replies via P2P QUIC
+- Uses Claude's own intelligence — no separate API keys needed
+
+The agent's behavior is defined in `agent-example/CLAUDE.md`.
+
+---
+
 ## License
 
 MIT
