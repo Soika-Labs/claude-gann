@@ -19,7 +19,7 @@ TOOL_DEF = {
         "properties": {
             "api_key": {
                 "type": "string",
-                "description": "GANN API key. Falls back to GANN_API_KEY env var.",
+                "description": "GANN API key. Optional — falls back to GANN_API_KEY env var.",
             },
             "agent_id": {
                 "type": "string",
@@ -27,7 +27,7 @@ TOOL_DEF = {
             },
             "base_url": {
                 "type": "string",
-                "description": "GANN server base URL. Falls back to GANN_BASE_URL env var or https://api.gnna.io.",
+                "description": "GANN server base URL. Optional — falls back to GANN_BASE_URL env var or https://api.gnna.io.",
             },
             "capacity": {
                 "type": "integer",
@@ -40,7 +40,7 @@ TOOL_DEF = {
                 "default": 30,
             },
         },
-        "required": ["api_key", "agent_id"],
+        "required": ["agent_id"],
     },
 }
 

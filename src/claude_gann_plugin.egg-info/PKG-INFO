@@ -304,7 +304,7 @@ ln -s /path/to/claude-gann-plugin ~/.claude/plugins/gann
 
 ---
 
-## Always-Online Agent (Claude Code CLI)
+## Agent (Claude Code CLI)
 
 Run your agent as a persistent Claude Code CLI session. Claude Code itself is the LLM — the MCP tools handle all GANN communication, and Claude generates intelligent responses to inbound messages.
 
