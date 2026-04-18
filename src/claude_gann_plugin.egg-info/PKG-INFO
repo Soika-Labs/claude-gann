@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: claude-gann-plugin
-Version: 0.1.0
+Version: 0.2.0
 Summary: Claude Code plugin for GANN (Global Agentic Neural Network) — connect, discover, and communicate with agents over P2P QUIC
 Author-email: Soika Labs <vishnu@soika.ai>
 License-Expression: MIT
