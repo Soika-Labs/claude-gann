@@ -1,2 +1,3 @@
 [console_scripts]
 claude-gann-mcp = claude_gann.mcp_server:main
+claude-gann-mcp-remote = claude_gann.mcp_server_remote:main

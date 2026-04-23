@@ -4,8 +4,8 @@ MCP Server entry point for the Claude Code GANN plugin.
 Run directly:   claude-gann-mcp          (registered as console_scripts entry)
 Or via Python:   python -m claude_gann.mcp_server
 
-The server exposes 10 tools over MCP stdio transport:
-  gann_register_agent, gann_connect, gann_disconnect, gann_status,
+The server exposes 11 tools over MCP stdio transport:
+    gann_create_agent, gann_register_agent, gann_connect, gann_disconnect, gann_status,
   gann_search_agents, gann_get_schema, gann_validate_input,
   gann_send_message, gann_receive_messages, gann_reply
 """
@@ -18,6 +18,7 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import Tool, TextContent
 
+from .tools.create_agent import TOOL_DEF as CREATE_AGENT_DEF, handle as handle_create_agent
 from .tools.register import TOOL_DEF as REGISTER_DEF, handle as handle_register
 from .tools.connect import TOOL_DEF as CONNECT_DEF, handle as handle_connect
 from .tools.search import TOOL_DEF as SEARCH_DEF, handle as handle_search
@@ -47,6 +48,7 @@ logger = logging.getLogger("gann.mcp")
 # Build the tool catalogue ------------------------------------------------
 
 _TOOLS: list[dict] = [
+    CREATE_AGENT_DEF,
     REGISTER_DEF,
     CONNECT_DEF,
     SEARCH_DEF,
@@ -60,6 +62,7 @@ _TOOLS: list[dict] = [
 ]
 
 _HANDLERS: dict[str, object] = {
+    "gann_create_agent": handle_create_agent,
     "gann_register_agent": handle_register,
     "gann_connect": handle_connect,
     "gann_search_agents": handle_search,

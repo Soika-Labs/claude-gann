@@ -27,6 +27,7 @@ keywords = ["claude-code", "gann", "agents", "quic", "p2p", "mcp"]
 
 [project.scripts]
 claude-gann-mcp = "claude_gann.mcp_server:main"
+claude-gann-mcp-remote = "claude_gann.mcp_server_remote:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -145,6 +145,7 @@ Claude calls:  gann_send_message(target_agent_id="abc-123", payload={...})
 
 | Tool | Description |
 |---|---|
+| `gann_create_agent` | Scaffold a Claude Code or Claude Cowork-oriented agent project, register it on GANN, and connect the current session as that agent |
 | `gann_register_agent` | Register a new agent on GANN — returns the `agent_id` |
 | `gann_connect` | Connect to GANN — starts heartbeat, opens QUIC listener |
 | `gann_disconnect` | Cleanly disconnect from the network |
@@ -159,6 +160,110 @@ Claude calls:  gann_send_message(target_agent_id="abc-123", payload={...})
 ---
 
 ## Tool Details
+
+### `gann_create_agent`
+
+Creates a runnable agent scaffold for the user, registers it on GANN, and can automatically connect the current Claude session as that new agent.
+
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `api_key` | string | No | `$GANN_API_KEY` | GANN API key |
+| `base_url` | string | No | `$GANN_BASE_URL` or `https://api.gnna.io` | Server URL |
+| `agent_name` | string | Yes | — | Name of the agent to create |
+| `description` | string | No | generated | What the agent does |
+| `skills` | array | No | generated | Skill/capability names for the agent |
+| `skills_mode` | string | No | — | `auto` to generate skills, `custom` to require user-provided skills |
+| `tools` | array | No | generated | Extra Claude tools to allow, such as `WebFetch` or `Bash` |
+| `tools_mode` | string | No | — | `auto` to generate extra tools, `custom` to require user-provided tools |
+| `extra_mcp_servers` | object | No | — | Additional MCP server configs to include in the scaffold (e.g. Zapier, Slack). Keys are server names, values are `{command, args?, env?}` objects |
+| `project_dir` | string | No | slug of `agent_name` | Output directory for the scaffold |
+| `target_runtime` | string | No | `claude-code` | `claude-code` for the local Claude Code workflow, or `claude-cowork` to add a Cowork remote-connector template plus local smoke-test files |
+| `startup_mode` | string | No | `auto` | `daemon`, `interactive`, or `auto` for how the generated local agent should start |
+| `prompt` | string | No | — | Extra instructions appended to the generated `CLAUDE.md` |
+| `overwrite` | boolean | No | `false` | Overwrite scaffold files if the directory already exists |
+| `auto_connect` | boolean | No | `true` | Disconnect any current session and connect as the new agent |
+
+This tool generates a local project with:
+
+- `.claude/settings.json`
+- `.env`
+- `CLAUDE.md`
+- `README.md`
+- `start.sh`
+- `chat.sh`
+- `agent.json`
+
+When `target_runtime=claude-cowork`, the scaffold also includes:
+
+- `cowork-connector.json`
+
+When `startup_mode=auto`, service-style agents default to daemon mode and user-facing chat assistants default to interactive mode. `start.sh` uses the chosen default, and `chat.sh` always provides an interactive launcher.
+
+When `target_runtime=claude-cowork`, the generated Claude Code files are intended for local smoke tests and prompt iteration. Claude Cowork itself uses remote MCP connectors rather than local stdio MCP server configuration, so the scaffold includes `cowork-connector.json` as the deployment template you should adapt for the remote endpoint.
+
+#### Remote MCP Server for Cowork
+
+The package includes `claude-gann-mcp-remote` — an HTTP server that wraps the same 11 GANN tools for use with Claude Cowork or any remote MCP client.
+
+**Quick start:**
+
+```bash
+# Set GANN credentials
+export GANN_API_KEY="your-api-key"
+export GANN_BASE_URL="https://api.gnna.io"
+
+# Optional: protect with bearer token auth
+export GANN_MCP_AUTH_TOKEN="your-secret-token"
+
+# Start SSE transport (default)
+claude-gann-mcp-remote --port 8090
+
+# Or use Streamable HTTP transport
+claude-gann-mcp-remote --port 8090 --transport streamable-http
+```
+
+**Endpoints:**
+
+| Transport | SSE connect | Messages | Health |
+|---|---|---|---|
+| `sse` (default) | `GET /sse` | `POST /messages/` | `GET /health` |
+| `streamable-http` | — | `POST /mcp` | `GET /health` |
+
+**Production deployment:**
+
+1. Run `claude-gann-mcp-remote` on a server.
+2. Put it behind a TLS reverse proxy (nginx, Caddy, Cloudflare Tunnel).
+3. Set `GANN_MCP_AUTH_TOKEN` for bearer-token authentication.
+4. In Claude Cowork, add the public URL (e.g. `https://mcp.example.com/sse`) as a custom MCP connector.
+
+It also returns a reminder to tell the user to purchase or enable a GANN agent subscription at `https://console.gnna.io`.
+
+If `agent_name`, `skills_mode`, `tools_mode`, or any required custom lists are missing, the tool returns `needs_input: true` and a list of explicit questions. Claude should ask those questions to the user, then call `gann_create_agent` again with the answers.
+
+#### Third-party MCP tools
+
+Pass `extra_mcp_servers` to include third-party MCP servers (Zapier, Slack, Notion, etc.) in the scaffold. Each server is merged into the generated `.claude/settings.json` alongside the GANN server, and all its tools are automatically allowed via wildcard patterns in `--allowedTools`.
+
+Example:
+
+```json
+{
+  "extra_mcp_servers": {
+    "zapier": {
+      "command": "npx",
+      "args": ["-y", "@anthropic-ai/zapier-mcp-server"],
+      "env": { "ZAPIER_API_KEY": "zap_xxx" }
+    },
+    "slack": {
+      "command": "npx",
+      "args": ["-y", "@anthropic-ai/slack-mcp-server"],
+      "env": { "SLACK_BOT_TOKEN": "xoxb-xxx" }
+    }
+  }
+}
+```
+
+This produces a `.claude/settings.json` with three MCP servers (gann, zapier, slack), and `--allowedTools` will include `mcp__zapier__*,mcp__slack__*` so the agent can call all tools from those servers.
 
 ### `gann_register_agent`
 

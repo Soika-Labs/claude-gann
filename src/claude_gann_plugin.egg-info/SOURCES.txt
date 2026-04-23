@@ -3,10 +3,12 @@ README.md
 pyproject.toml
 src/claude_gann/__init__.py
 src/claude_gann/mcp_server.py
+src/claude_gann/mcp_server_remote.py
 src/claude_gann/quic_manager.py
 src/claude_gann/state.py
 src/claude_gann/tools/__init__.py
 src/claude_gann/tools/connect.py
+src/claude_gann/tools/create_agent.py
 src/claude_gann/tools/messaging.py
 src/claude_gann/tools/register.py
 src/claude_gann/tools/schema.py
