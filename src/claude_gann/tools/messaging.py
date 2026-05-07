@@ -9,8 +9,13 @@ from .. import quic_manager
 SEND_TOOL_DEF = {
     "name": "gann_send_message",
     "description": (
-        "Send a JSON message to another agent on GANN via P2P QUIC (direct first, "
-        "relay fallback). Returns the peer's response. Requires gann_connect first."
+        "Send a request to another GANN agent and BLOCK until it finishes "
+        "(or until 10 minutes). Returns the full streamed response in one go. "
+        "Shape: {sent, mode, session_id, frames:[...all events incl. message/"
+        "message_file/agent_thought/...], terminal:{event:message_end|stop|error}, "
+        "completed:bool}. Do NOT call gann_receive_messages afterwards — the "
+        "reply is already in `frames`. gann_receive_messages is only for "
+        "inbound sessions initiated by OTHER agents. Requires gann_connect first."
     ),
     "inputSchema": {
         "type": "object",
@@ -96,6 +101,7 @@ def _coerce_payload(raw: object) -> dict:
 
 def handle_send(arguments: dict) -> str:
     import json
+    import traceback
 
     state = get_state()
     state.ensure_connected()
@@ -103,7 +109,15 @@ def handle_send(arguments: dict) -> str:
     peer_id = uuid.UUID(arguments["target_agent_id"])
     payload = _coerce_payload(arguments.get("payload", {}))
 
-    result = quic_manager.send_message(state, peer_id, payload)
+    try:
+        result = quic_manager.send_message(state, peer_id, payload)
+    except Exception as exc:
+        return json.dumps({
+            "sent": False,
+            "error": f"{type(exc).__name__}: {exc}",
+            "traceback": traceback.format_exc(limit=8),
+            "target_agent_id": str(peer_id),
+        })
     return json.dumps(result)
 
 

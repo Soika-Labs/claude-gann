@@ -113,7 +113,18 @@ async def _run() -> None:
 
 
 def main() -> None:
-    logging.basicConfig(level=logging.INFO, format="%(name)s %(levelname)s %(message)s")
+    import os, sys
+    log_path = os.environ.get("CLAUDE_GANN_LOG_FILE") or os.path.join(
+        os.path.expanduser("~"), ".claude-gann-mcp.log"
+    )
+    fmt = "%(asctime)s %(name)s %(levelname)s %(message)s"
+    handlers = [logging.FileHandler(log_path, mode="a")]
+    # Also emit to stderr so a parent that captures it can see it.
+    handlers.append(logging.StreamHandler(sys.stderr))
+    logging.basicConfig(level=logging.DEBUG, format=fmt, handlers=handlers)
+    logging.getLogger("gann").setLevel(logging.DEBUG)
+    logging.getLogger("gann.quic").setLevel(logging.DEBUG)
+    logging.getLogger("gann.mcp").info("claude-gann MCP starting; log_file=%s", log_path)
     asyncio.run(_run())
 
 

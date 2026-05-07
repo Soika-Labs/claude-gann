@@ -287,25 +287,71 @@ async def _send_impl(state: GannState, peer_id: uuid.UUID, payload: dict) -> dic
         options=QuicDirectFirstOptions(direct_timeout=5.0),
     )
 
-    try:
-        encoded = json.dumps(payload, separators=(",", ":")).encode()
+    # Soika-style runtime bridges (the standard GANN agent runtime) expect the
+    # request envelope `{"event": "request", "payload": <user payload>}` and
+    # respond with a stream of frames terminated by `message_end`/`stop`/`error`.
+    # Any frame whose `event` is not "request" is dropped by the responder, so
+    # without this wrapping the responder hangs and we time out at 60s/120s.
+    request_envelope = {"event": "request", "payload": payload}
+    encoded = json.dumps(request_envelope, separators=(",", ":")).encode()
+    terminal_events = {"message_end", "stop", "error"}
+    # Frames to silently drop (don't return them but do reset idle clock).
+    skip_events = {"ready", "ping", "pong"}
+    # Image/video generation can take minutes. We wait for the overall budget
+    # and ONLY break early on a real terminal frame (message_end / stop /
+    # error). The Soika responder bridge sends `ping` every ~5s as keepalive,
+    # but if it stalls we still wait the full overall budget rather than
+    # cutting off mid-generation.
+    overall_timeout = 600.0
 
+    def _decode_frame(raw: object) -> dict:
+        if isinstance(raw, (str, bytes)):
+            try:
+                txt = raw.decode() if isinstance(raw, bytes) else raw
+                return json.loads(txt)
+            except Exception:
+                return {"raw": raw if isinstance(raw, str) else raw.decode("utf-8", errors="replace")}
+        if isinstance(raw, dict):
+            return raw
+        return {"raw": str(raw)}
+
+    try:
         if result.mode == "relay" and result.relay_transport and result.token:
             await result.relay_transport.relay_send(
-                result.token, result.session_id, payload
+                result.token, result.session_id, request_envelope
             )
-            frame = await asyncio.wait_for(
-                result.relay_transport.recv_relay_data(), timeout=60.0
-            )
-            raw = frame.payload
-            response = json.loads(raw) if isinstance(raw, (str, bytes)) else raw
 
-            # Signal disconnect to GANN server
+            frames: list[dict] = []
+            terminal: dict | None = None
+            deadline = asyncio.get_event_loop().time() + overall_timeout
+            while True:
+                remaining = deadline - asyncio.get_event_loop().time()
+                if remaining <= 0:
+                    break
+                try:
+                    frame = await asyncio.wait_for(
+                        result.relay_transport.recv_relay_data(),
+                        timeout=remaining,
+                    )
+                except asyncio.TimeoutError:
+                    break
+                evt = _decode_frame(getattr(frame, "payload", frame))
+                evt_name = str(evt.get("event") or evt.get("type") or "").lower()
+                logger.info(
+                    "gann_send relay frame received: event=%s session=%s",
+                    evt_name or "<unknown>",
+                    result.session_id,
+                )
+                if evt_name in skip_events:
+                    continue
+                frames.append(evt)
+                if evt_name in terminal_events:
+                    terminal = evt
+                    break
+
             try:
                 channel.disconnect_session(
-                    str(result.session_id),
-                    str(peer_id),
-                    "request_completed",
+                    str(result.session_id), str(peer_id), "request_completed"
                 )
             except Exception:
                 pass
@@ -314,7 +360,9 @@ async def _send_impl(state: GannState, peer_id: uuid.UUID, payload: dict) -> dic
                 "sent": True,
                 "mode": "relay",
                 "session_id": str(result.session_id),
-                "response": response,
+                "frames": frames,
+                "terminal": terminal,
+                "completed": terminal is not None,
             }
 
         elif result.mode == "direct" and result.peer_connection:
@@ -322,18 +370,49 @@ async def _send_impl(state: GannState, peer_id: uuid.UUID, payload: dict) -> dic
             writer.write(encoded)
             await writer.drain()
             writer.write_eof()
-            try:
-                raw = await asyncio.wait_for(reader.read(), timeout=60.0)
-            except asyncio.TimeoutError:
-                raw = b""
-            response = json.loads(raw.decode()) if raw else {}
+            frames: list[dict] = []
+            terminal: dict | None = None
+            buffer = b""
+            deadline = asyncio.get_event_loop().time() + overall_timeout
+            while True:
+                remaining = deadline - asyncio.get_event_loop().time()
+                if remaining <= 0:
+                    break
+                try:
+                    chunk = await asyncio.wait_for(reader.read(65536), timeout=remaining)
+                except asyncio.TimeoutError:
+                    break
+                if not chunk:
+                    break
+                buffer += chunk
+                # Try to split on newlines; many SDKs frame JSON-per-line.
+                while b"\n" in buffer:
+                    line, _, rest = buffer.partition(b"\n")
+                    buffer = rest
+                    line = line.strip()
+                    if not line:
+                        continue
+                    evt = _decode_frame(line)
+                    evt_name = str(evt.get("event") or evt.get("type") or "").lower()
+                    if evt_name in skip_events:
+                        continue
+                    frames.append(evt)
+                    if evt_name in terminal_events:
+                        terminal = evt
+                        break
+                if terminal is not None:
+                    break
+            if terminal is None and buffer.strip():
+                evt = _decode_frame(buffer.strip())
+                evt_name = str(evt.get("event") or evt.get("type") or "").lower()
+                if evt_name not in skip_events:
+                    frames.append(evt)
+                    if evt_name in terminal_events:
+                        terminal = evt
 
-            # Signal disconnect to GANN server
             try:
                 channel.disconnect_session(
-                    str(result.session_id),
-                    str(peer_id),
-                    "request_completed",
+                    str(result.session_id), str(peer_id), "request_completed"
                 )
             except Exception:
                 pass
@@ -342,7 +421,9 @@ async def _send_impl(state: GannState, peer_id: uuid.UUID, payload: dict) -> dic
                 "sent": True,
                 "mode": "direct",
                 "session_id": str(result.session_id),
-                "response": response,
+                "frames": frames,
+                "terminal": terminal,
+                "completed": terminal is not None,
             }
         else:
             return {"sent": False, "error": "no usable QUIC transport"}
@@ -373,4 +454,4 @@ def send_message(state: GannState, peer_id: uuid.UUID, payload: dict) -> dict:
     future = asyncio.run_coroutine_threadsafe(
         _send_impl(state, peer_id, payload), state.loop
     )
-    return future.result(timeout=120.0)
+    return future.result(timeout=620.0)
