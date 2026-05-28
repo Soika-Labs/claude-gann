@@ -149,8 +149,12 @@ async def quic_accept_loop(state: GannState) -> None:
 
     while state.connected:
         try:
+            # direct_timeout must match (or exceed) the initiator's setting so
+            # cross-tenant pairs can complete a direct QUIC handshake instead of
+            # falling back to relay (relays are tenant-scoped and cannot bridge
+            # peers that hold different GANN_API_KEYs).
             channel, result = await state.client.accept_quic_direct_first(
-                options=QuicDirectFirstOptions(direct_timeout=1.0),
+                options=QuicDirectFirstOptions(direct_timeout=20.0),
                 offer_timeout=300.0,
             )
             consecutive_errors = 0
